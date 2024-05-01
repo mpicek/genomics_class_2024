@@ -1,1 +1,2 @@
-# genomics_class_2024
+# Genomics homeworks (2024)
+### By Martin Picek

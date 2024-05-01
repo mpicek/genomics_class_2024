@@ -1,0 +1,71 @@
+REFERENCE_GENOME = "data/chr7.fa.gz"
+REZIPPED_GENOME = "data/chr7.gz"
+
+rule all:
+    input:
+        expand("out/{sample}.vcf", sample=["R1", "R2"])
+
+rule rezip_and_index_chrom:
+    input:
+        REFERENCE_GENOME
+    output:
+        REZIPPED_GENOME,
+        REZIPPED_GENOME + ".amb",
+        REZIPPED_GENOME + ".ann",
+        REZIPPED_GENOME + ".bwt",
+        REZIPPED_GENOME + ".pac",
+        REZIPPED_GENOME + ".sa"
+    shell:
+        "gunzip -c {input} | bgzip -c > {REZIPPED_GENOME} ; bwa index {REZIPPED_GENOME}"
+
+rule bwa_map_to_BAM:
+    # maps the reads and converts the output to the BAM format
+    input:
+        REZIPPED_GENOME,
+        "data/{read}.fastq.gz",
+    output:
+        "mapped/{read}.bam",
+    shell:
+        # -Sb means input is SAM and output is BAM
+        "bwa mem {input} | samtools view -Sb - > {output}"
+
+rule samtools_sort:
+    input:
+        "mapped/{sample}.bam"
+    output:
+        "sorted/{sample}.bam"
+    shell:
+        "samtools sort -T sorted/{wildcards.sample} "
+        "-O bam {input} > {output}"
+
+
+rule index_bam:
+    input:
+        "sorted/{sample}.bam"
+    output:
+        "indexed_bam/{sample}.bam.bai"
+    shell:
+        """
+        samtools index {input} > {output}
+        """
+
+rule call_variants:
+    input:
+        ref=REZIPPED_GENOME,
+        bam="sorted/{sample}.bam"
+    output:
+        "variants/{sample}.vcf"
+    shell:
+        """
+        bcftools mpileup -Ou -f {input.ref} {input.bam} | bcftools call -mv -Ov -o {output}
+        """
+
+rule vep_annotate:
+    input:
+        "variants/{sample}.vcf"
+    output:
+        "out/{sample}.vcf"
+    shell:
+        """
+        vep -i {input} -o {output} --species "human" --fasta {REZIPPED_GENOME} --vcf --sift b --polyphen b --database
+        """
