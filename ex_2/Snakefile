@@ -1,0 +1,48 @@
+REFERENCE_GENOME = "data/hg19.fa.gz"
+
+rule all:
+    input:
+        "out/{type}_read_depth_info".format(sample=config['type'])
+
+rule index_chrom:
+    input:
+        REFERENCE_GENOME
+    output:
+        REFERENCE_GENOME,
+        REFERENCE_GENOME + ".amb",
+        REFERENCE_GENOME + ".ann",
+        REFERENCE_GENOME + ".bwt",
+        REFERENCE_GENOME + ".pac",
+        REFERENCE_GENOME + ".sa"
+    shell:
+        "bwa index {REFERENCE_GENOME}"
+
+rule bwa_map_to_BAM:
+    input:
+        ref=REFERENCE_GENOME,
+        r1="data/{type}.r1.fq.gz",
+        r2="data/{type}.r2.fq.gz"
+    output:
+        "mapped/{type}.sam"
+    shell:
+        # multithread it on 8 threads
+        "bwa mem -t 8 {ref} {r1} {r2} | samtools view -Sb - > {output}"
+    
+rule samtools_sort:
+    input:
+        "mapped/{type}.bam"
+    output:
+        "sorted/{type}.bam"
+    shell:
+        "samtools sort {input} -o {output}"
+
+rule index_bam:
+    input:
+        "sorted/{type}.bam"
+    output:
+        "indexed_bam/{type}.bam.bai"
+    shell:
+        """
+        samtools index {input} > {output}
+        """
+
