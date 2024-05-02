@@ -1,9 +1,15 @@
 REFERENCE_GENOME = "data/hg19.fa.gz"
+PREFIX = "tu" # CHANGE TO "tu" FOR THE TUMOR SAMPLE
+R1 = f"data/{PREFIX}.r1.fq.gz"
+R2 = f"data/{PREFIX}.r2.fq.gz"
+OUTPUT_FOLDER="output/"
 
+# The final output target of the workflow
 rule all:
     input:
-        "out/{type}_read_depth_info".format(sample=config['type'])
+        f"{OUTPUT_FOLDER}{PREFIX}_read_depth.csv"
 
+# Index the reference genome - takes 2h
 rule index_chrom:
     input:
         REFERENCE_GENOME
@@ -17,32 +23,79 @@ rule index_chrom:
     shell:
         "bwa index {REFERENCE_GENOME}"
 
-rule bwa_map_to_BAM:
+# Align reads to the reference genome
+rule align_reads:
     input:
         ref=REFERENCE_GENOME,
-        r1="data/{type}.r1.fq.gz",
-        r2="data/{type}.r2.fq.gz"
+        r1=R1,
+        r2=R2
     output:
-        "mapped/{type}.sam"
+        sam=f"{OUTPUT_FOLDER}{PREFIX}_aligned.sam"
     shell:
-        # multithread it on 8 threads
-        "bwa mem -t 8 {ref} {r1} {r2} | samtools view -Sb - > {output}"
-    
-rule samtools_sort:
-    input:
-        "mapped/{type}.bam"
-    output:
-        "sorted/{type}.bam"
-    shell:
-        "samtools sort {input} -o {output}"
+        "bwa mem -t 8 {input.ref} {input.r1} {input.r2} > {output.sam}"
 
+# Convert SAM to BAM
+rule sam_to_bam:
+    input:
+        f"{OUTPUT_FOLDER}{PREFIX}_aligned.sam"
+    output:
+        bam=f"{OUTPUT_FOLDER}{PREFIX}_aligned.bam"
+    shell:
+        "samtools view -S -b {input} > {output.bam}"
+
+# Sort BAM file
+rule sort_bam:
+    input:
+        f"{OUTPUT_FOLDER}{PREFIX}_aligned.bam"
+    output:
+        sorted_bam=f"{OUTPUT_FOLDER}{PREFIX}_aligned_sorted.bam"
+    shell:
+        "samtools sort {input} -o {output.sorted_bam}"
+
+# Index the sorted BAM file
 rule index_bam:
     input:
-        "sorted/{type}.bam"
+        f"{OUTPUT_FOLDER}{PREFIX}_aligned_sorted.bam"
     output:
-        "indexed_bam/{type}.bam.bai"
+        f"{OUTPUT_FOLDER}{PREFIX}_aligned_sorted.bam.bai"
     shell:
-        """
-        samtools index {input} > {output}
-        """
+        "samtools index {input}"
 
+## SO FAR IT WAS BASICALLY THE SAME AS THE PREVIOUS WORKFLOW
+
+rule subset_bam:
+    input:
+        bam=f"{OUTPUT_FOLDER}{PREFIX}_aligned_sorted.bam",
+        bai=f"{OUTPUT_FOLDER}{PREFIX}_aligned_sorted.bam.bai"
+    output:
+        f"{OUTPUT_FOLDER}{PREFIX}_subset.bam"
+    shell:
+        "samtools view -b {input} chrX:20000000-40000000 > {output}"
+
+# Sort the subset BAM
+rule sort_subset_bam:
+    input:
+        f"{OUTPUT_FOLDER}{PREFIX}_subset.bam"
+    output:
+        sorted_bam=f"{OUTPUT_FOLDER}{PREFIX}_subset_sorted.bam"
+    shell:
+        "samtools sort {input} -o {output.sorted_bam}"
+
+
+# Index the sorted subset BAM
+rule index_subset_bam:
+    input:
+        f"{OUTPUT_FOLDER}{PREFIX}_subset_sorted.bam"
+    output:
+        f"{OUTPUT_FOLDER}{PREFIX}_subset_sorted.bam.bai"
+    shell:
+        "samtools index {input}"
+
+# Generate a read-depth file from the subset BAM
+rule generate_read_depth:
+    input:
+        f"{OUTPUT_FOLDER}{PREFIX}_subset_sorted.bam"
+    output:
+        depth_file=f"{OUTPUT_FOLDER}{PREFIX}_read_depth.csv"
+    shell:
+        "samtools depth {input} > {output.depth_file}"

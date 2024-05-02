@@ -2,46 +2,47 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Read the output of samtools depth
-def read_depth_file(depth_file):
-    df = pd.read_csv(depth_file, sep='\t', header=None, names=['chrom', 'pos', 'depth'])
-    return df
+# Function to load depth data from a file
+def load_depth_data(file_path):
+    data_frame = pd.read_csv(file_path, delimiter='\t', header=None, names=['chromosome', 'position', 'depth'])
+    return data_frame
 
-# Calculate mean read depth for a window of 1000 bases
-def calculate_mean_depth(df):
-    window_size = 1000
-    df['window'] = df['pos'] // window_size
-    mean_depth = df.groupby(['chrom', 'window'])['depth'].mean().reset_index()
-    mean_depth['pos'] = mean_depth['window'] * window_size + window_size // 2
-    return mean_depth
+# Function to compute average depth across specified base pair intervals
+def compute_average_depth(data_frame):
+    interval = 1000
+    data_frame['interval'] = data_frame['position'] // interval
+    average_depth = data_frame.groupby(['chromosome', 'interval'])['depth'].mean().reset_index()
+    average_depth['center_position'] = average_depth['interval'] * interval + interval // 2
+    return average_depth
 
-# Calculate log2 ratio between tumor and wild-type
-def calculate_log2_ratio(df_tumor, df_wildtype):
-    merged_df = pd.merge(df_tumor, df_wildtype, on=['chrom', 'pos'], suffixes=('_tumor', '_wildtype'))
-    merged_df['log2_ratio'] = np.log2(merged_df['depth_tumor'] / merged_df['depth_wildtype'])
-    return merged_df
+# Function to compute the log2 ratio of tumor to wild-type depths
+def log2_ratio(tumor_data, normal_data):
+    combined_data = pd.merge(tumor_data, normal_data, on=['chromosome', 'center_position'], suffixes=('_tumor', '_normal'))
+    combined_data['log2_ratio'] = np.log2(combined_data['depth_tumor'] / combined_data['depth_normal'])
+    return combined_data
 
-# Plot log2 ratio and save as image
-def save_log2_ratio_plot(df):
+# Function to plot the log2 ratio and save to a file
+def plot_log2_ratio(data_frame):
     plt.figure(figsize=(10, 6))
-    plt.plot(df['pos'], df['log2_ratio'], color='blue', linestyle='-', marker='.', markersize=2)
-    plt.xlabel('Position in genome')
-    plt.ylabel('Log2 Ratio (Tumor/Wild-type)')
-    plt.title('Read-Depth Plot')
+    plt.plot(data_frame['center_position'], data_frame['log2_ratio'], color='red', linestyle='-', marker='o', markersize=2)
+    plt.xlabel('Genomic Position')
+    plt.ylabel('Log2 Ratio (Tumor vs. Normal)')
+    plt.title('Depth of Read Plot')
     plt.grid(True)
-    plt.savefig('read_depth_plot.png', bbox_inches='tight')  # Save plot as image file
+    plt.savefig('output/read_depth_plot.png', bbox_inches='tight')  # Save the plot as a PNG file
     plt.close()
 
+# Main variables for file paths
+tumor_file = 'output/tu_read_depth.csv'
+normal_file = 'output/wt_read_depth.csv'
 
-tumor_depth_file = 'tu_read_depth.txt'
-wildtype_depth_file = 'wt_read_depth.txt'
+# Load, process, and plot data
+tumor_df = load_depth_data(tumor_file)
+normal_df = load_depth_data(normal_file)
 
-df_tumor = read_depth_file(tumor_depth_file)
-df_wildtype = read_depth_file(wildtype_depth_file)
+average_tumor_depth = compute_average_depth(tumor_df)
+average_normal_depth = compute_average_depth(normal_df)
 
-df_mean_depth_tumor = calculate_mean_depth(df_tumor)
-df_mean_depth_wildtype = calculate_mean_depth(df_wildtype)
+ratio_data = log2_ratio(average_tumor_depth, average_normal_depth)
 
-df_log2_ratio = calculate_log2_ratio(df_mean_depth_tumor, df_mean_depth_wildtype)
-
-save_log2_ratio_plot(df_log2_ratio)
+plot_log2_ratio(ratio_data)
