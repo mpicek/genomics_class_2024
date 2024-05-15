@@ -24,4 +24,19 @@ In the next task, we plotted the normalized counts for the GJB2 gene (a gene wit
 
 ![Normalized counts of expression of the GJB2 gene](GJB2_normalized.png)
 
+### PCA Plot
+
+We tried both transforms: Variance stabilizing transformation and Regularized log transformation. Whereas the former explained overall 71% of variance (using first two PC), the second explained just 57% (using first two PC). The class (tumor, wild) separation could be done in both cases in the same way, we yielded similar results. Therefore, we deem the former transform to result in better PCA results, visualized in the following figure:
+
+![PCA Plot](PCA_plot.png)
+
+### Heatmap visualization
+
+Similarly we performed the heatmap visualization using both transforms. Again, only the VSD heatmap reported in this report:
+
+![Heatmap VSD](heatmap_vsd.png)
+
+### Saving the results
+
+And, finally, we saved the significant differences into the .csv file.
 

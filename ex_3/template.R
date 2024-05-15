@@ -43,13 +43,31 @@ plotCounts(dds, gene="GJB2", intgroup="condition")
 # Generate a PCA plot of the samples using the transformed count data
 # Tutorial: http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#extracting-transformed-values
 # Tutorial: http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#principal-component-plot-of-the-samples
+vsd <- vst(dds, blind=FALSE) # 0.71 explained variance
+plotPCA(vsd, intgroup="condition")
 
+# SAVING THE PLOTS FOR THE REPORT:
+# png("ex_3/PCA_plot.png", width = 800, height = 600)
+# plotPCA(vsd, intgroup="condition")
+# dev.off()
+
+rld <- rlog(dds) # 0.57 explained variance
+plotPCA(rld, intgroup="condition")
 
 # Visualize the differential gene expression results as a heatmap
 # Take the top 20 genes according to the adjusted p-value
 # Tutorial: http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#heatmap-of-the-count-matrix
+top_genes <- head(order(results$padj), 20)  
+pheatmap(assay(vsd)[top_genes,])
+pheatmap(assay(rld)[top_genes,])
+
+# SAVING THE PLOTS FOR THE REPORT:
+# png("ex_3/heatmap_vsd.png", width = 800, height = 600)
+# pheatmap(assay(vsd)[top_genes,])
+# dev.off()
 
 
 # Export the significant results (padj < 0.01) to a CSV file
 # Tutorial: http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#exporting-results-to-csv-files
-
+s_res <- subset(results, padj < 0.01)
+write.csv(as.data.frame(s_res), file="ex_3/results.csv")
